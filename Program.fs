@@ -1,45 +1,34 @@
 ﻿module Program
 
 open Pulumi.FSharp
-open Pulumi.Azure.Core
-open Pulumi.Azure
+open Pulumi.AzureNextGen.Resources.Latest
+open Pulumi.AzureNextGen.ApiManagement.Latest
 
 let infra () =
     let stackName = Pulumi.Deployment.Instance.StackName
     // Create an Azure Resource Group
     let resourceGroupName = sprintf "rg-nojaf-apim-%s" stackName
-    let resourceGroupArgs = ResourceGroupArgs(Name = input resourceGroupName)
-    let resourceGroup = ResourceGroup(resourceGroupName, args = resourceGroupArgs)
 
-    let arm = """
-    {
-        "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-        "contentVersion": "1.0.0.0",
-        "resources": [{
-            "apiVersion": "2019-12-01",
-            "name": "nojaf-apim",
-            "type": "Microsoft.ApiManagement/service",
-            "location": "westeurope",
-            "tags": {},
-            "sku": {
-                "name": "Consumption",
-                "capacity": "0"
-            },
-            "properties": {
-                "publisherEmail": "apim@nojaf.com",
-                "publisherName": "nojaf"
-            }
-        }]
-    }
-    """
+    let resourceGroupArgs =
+        ResourceGroupArgs(ResourceGroupName = input resourceGroupName, Location = input "West Europe")
 
-    let deployment = TemplateDeployment("nojaf-apim", TemplateDeploymentArgs(ResourceGroupName = io resourceGroup.Name,
-                                                                                      TemplateBody = input arm,
-                                                                                      DeploymentMode = input "Incremental"))
+    let resourceGroup =
+        ResourceGroup(resourceGroupName, args = resourceGroupArgs)
 
+    let service =
+        ApiManagementService
+            ("nojaf-apim",
+             ApiManagementServiceArgs
+                 (ResourceGroupName = io resourceGroup.Name,
+                  ServiceName = input "nojaf-apim",
+                  Location = input "West Europe",
+                  PublisherEmail = input "apim@nojaf.com",
+                  PublisherName = input "nojaf",
+                  Sku =
+                      input
+                          (Inputs.ApiManagementServiceSkuPropertiesArgs(Capacity = input 0, Name = input "Consumption"))))
 
-    dict [ ("deploymentId", box deployment.Id) ]
+    dict [ ("serviceUrl", box service.GatewayUrl) ]
 
 [<EntryPoint>]
-let main _ =
-  Deployment.run infra
+let main _ = Deployment.run infra
